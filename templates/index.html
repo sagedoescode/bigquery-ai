@@ -4,20 +4,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BigQuery Sales Data Chat</title>
+    <title>BigQuery Data Chat</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="chat-container">
         <div class="chat-header">
-            <h1>Sales Data Assistant</h1>
-            <p>Ask questions about your sales data in natural language</p>
+            <h1>Data Assistant</h1>
+            <p>Ask questions about your data in natural language</p>
         </div>
-        
+        <div class="config-panel" id="config-panel">
+            <div class="config-header">
+                <h3>Configuration</h3>
+                <button class="config-toggle" id="config-toggle">⚙️</button>
+            </div>
+            <div class="config-content" id="config-content">
+                <div class="config-group">
+                    <label for="project-id">Google Cloud Project ID:</label>
+                    <input type="text" id="project-id" value="gen-lang-client-0691935742" placeholder="Your GCP Project ID">
+                </div>
+                <div class="config-group">
+                    <label for="location">Location:</label>
+                    <select id="location">
+                        <option value="global">global</option>
+                        <option value="us-central1">us-central1</option>
+                        <option value="us-east1">us-east1</option>
+                        <option value="europe-west1">europe-west1</option>
+                        <option value="asia-east1">asia-east1</option>
+                    </select>
+                </div>
+                <div class="config-group">
+                    <label for="dataset-id">BigQuery Dataset ID:</label>
+                    <input type="text" id="dataset-id" value="accountstable" placeholder="BigQuery Dataset ID">
+                </div>
+                <div class="config-group">
+                    <label for="table-id">BigQuery Table ID (optional):</label>
+                    <input type="text" id="table-id" value="salestable" placeholder="Leave empty for default">
+                </div>
+                <div class="config-group">
+                    <label for="data-dictionary">Data Dictionary (Field Definitions):</label>
+                    <textarea id="data-dictionary" rows="4" placeholder="Example:&#10;net_value: Final revenue amount (use for all revenue calculations)&#10;conversion_value: Initial conversion value&#10;conversion_date: Transaction date"></textarea>
+                    <small style="color: #6b7280; display: block; margin-top: 5px;">
+                        Define your fields to ensure consistent query results. Format: field_name: description
+                    </small>
+                </div>
+                <div class="config-actions">
+                    <button id="save-config" class="save-btn">Save Configuration</button>
+                    <button id="reset-config" class="reset-btn">Reset to Defaults</button>
+                </div>
+                <div class="config-status" id="config-status"></div>
+            </div>
+        </div>
         <div class="chat-messages" id="chat-messages">
             <div class="message bot-message">
                 <div class="message-content">
-                    <p>Hello! I'm your sales data assistant. You can ask me questions like:</p>
+                    <p>Hello! I'm your data assistant. You can ask me questions like:</p>
                     <ul>
                         <li>"Show me July spend per market"</li>
                         <li>"What's the YoY growth in revenue?"</li>

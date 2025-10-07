@@ -6,9 +6,9 @@ load_dotenv()
 
 class Config:
     # Google Cloud Configuration
-    PROJECT_ID = os.getenv('GOOGLE_CLOUD_PROJECT_ID', 'graphical-cairn-420213')
+    PROJECT_ID = os.getenv('GOOGLE_CLOUD_PROJECT_ID', 'gen-lang-client-0691935742')
     LOCATION = os.getenv('GOOGLE_CLOUD_LOCATION', 'global')
-    CREDENTIALS_PATH = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', 'auth/graphical-cairn-420213-3c84d67c7797.json')
+    CREDENTIALS_PATH = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', 'auth/gen-lang-client-0691935742-7f02a3e9f353.json')
 
     # BigQuery Configuration
     BIGQUERY_DATASET_ID = os.getenv('BIGQUERY_DATASET_ID', 'bigquery-public-data.covid19_weathersource_com')
