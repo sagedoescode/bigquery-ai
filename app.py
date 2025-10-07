@@ -448,4 +448,5 @@ def chat_endpoint():
     except Exception as e:
         logger.error(f"Chat endpoint error: {e}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
-
+if __name__ == '__main__':
+    app.run(debug=app.config.get('DEBUG', True), host='0.0.0.0', port=5000)
