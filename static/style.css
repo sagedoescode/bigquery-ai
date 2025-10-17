@@ -52,7 +52,7 @@ body {
 }
 
 .config-content.expanded {
-    max-height: 600px;
+    max-height: 800px;
     padding: 20px;
 }
 
@@ -90,7 +90,44 @@ body {
     gap: 10px;
     margin-top: 20px;
 }
+.table-selector {
+    margin-top: 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 10px;
+    background-color: #f8fafc;
+}
 
+.table-selector p {
+    margin: 0 0 8px 0;
+    font-size: 0.9rem;
+    color: #4b5563;
+}
+
+.table-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.table-select-btn {
+    background-color: #e2e8f0;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.table-select-btn:hover {
+    background-color: #cbd5e1;
+}
+
+.table-select-btn.selected {
+    background-color: #3b82f6;
+    color: white;
+}
 .save-btn, .reset-btn {
     flex: 1;
     padding: 10px 15px;

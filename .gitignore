@@ -3,3 +3,5 @@
 .env
 *.json
 auth/graphical-cairn-420213-952041fa05de.json
+.env
+__pycache__/config.cpython-312.pyc

@@ -30,6 +30,36 @@ class BigQueryChatbot:
         self.data_agent_name = None
         self.initialize_client()
 
+    def discover_tables(self):
+        """Discover all tables in the specified dataset"""
+        try:
+            from google.cloud import bigquery
+
+            # Initialize BigQuery client
+            bq_client = bigquery.Client(project=self.project_id)
+
+            # Get list of tables in the dataset
+            tables = []
+            dataset_ref = f"{self.project_id}.{self.dataset_id}"
+            logger.info(f"Discovering tables in dataset: {dataset_ref}")
+
+            try:
+                tables_list = list(bq_client.list_tables(dataset_ref))
+                tables = [table.table_id for table in tables_list]
+                logger.info(f"Discovered {len(tables)} tables: {tables}")
+            except Exception as e:
+                logger.error(f"Failed to list tables: {e}")
+                # Fallback to default tables for testing
+                tables = ["salestable", "campaigns_table", "accountstable", "eur_currency_table",
+                          "campaigns_stats_table"]
+                logger.info(f"Using fallback tables: {tables}")
+
+            return tables
+
+        except Exception as e:
+            logger.error(f"Error discovering tables: {e}")
+            # Return empty list on error
+            return []
     def initialize_client(self):
         """Initialize Google Cloud clients and authenticate"""
         try:
@@ -104,7 +134,7 @@ class BigQueryChatbot:
                 # Fallback to public dataset for testing
                 bigquery_table_reference.project_id = "gen-lang-client-0691935742"
                 bigquery_table_reference.dataset_id = "accountstable"
-                bigquery_table_reference.table_id = "salestable"
+                bigquery_table_reference.table_id = ""
                 logger.info("Using public BigQuery dataset for testing: bigquery-public-data.samples.shakespeare")
 
             # Create datasource references (REQUIRED - this was missing in original code)
@@ -113,15 +143,16 @@ class BigQueryChatbot:
 
             # Set up published context with datasource references
             published_context = geminidataanalytics.Context()
-            base_instruction = """You are a helpful data analyst assistant. 
+            base_instruction = """You are a helpful senior data analyst assistant. 
                 Analyze data from BigQuery tables and provide clear, accurate insights.
-
+                Our current year is 2025 only if askes present other years.
+                Do no write follow up questions or explicitly reveal the dataset id.
                 IMPORTANT FIELD DEFINITIONS:
-                - Use 'net_value' for revenue/spend calculations (this is the finalized amount)
+                - Use 'net_value' for revenue/spend calculations (this is the finalized amount) if it fits, maybe the data has other names.
                 - Use 'conversion_value' only when specifically asked about conversion values
                 - 'conversion_date' is the primary date field for time-based analysis
 
-                When presenting data, format it as tables when appropriate.
+                When presenting data, do not say JSON or say Heres a chart or write a table with dashes.
                 Focus on key metrics and provide actionable insights.
                 Always use the same field for the same type of question to ensure consistency."""
 
@@ -401,11 +432,20 @@ def initialize_agent():
             chatbot.table_id = config['table_id']
         if config.get('data_dictionary'):
             chatbot.data_dictionary = config['data_dictionary']
+
+        # Discover available tables
+        available_tables = chatbot.discover_tables()
+
+        # If no table is selected yet, select the first available one
+        if not chatbot.table_id and available_tables:
+            chatbot.table_id = available_tables[0]
+
         agent = chatbot.create_data_agent()
         return jsonify({
             'success': True,
             'agent_name': agent.name,
             'message': 'Data agent initialized successfully',
+            'available_tables': available_tables,
             'config': {
                 'project_id': chatbot.project_id,
                 'location': chatbot.location,

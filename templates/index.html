@@ -13,44 +13,61 @@
             <h1>Data Assistant</h1>
             <p>Ask questions about your data in natural language</p>
         </div>
+        <!-- Improved Config Panel with Two-Column Layout -->
         <div class="config-panel" id="config-panel">
             <div class="config-header">
                 <h3>Configuration</h3>
                 <button class="config-toggle" id="config-toggle">⚙️</button>
             </div>
             <div class="config-content" id="config-content">
-                <div class="config-group">
-                    <label for="project-id">Google Cloud Project ID:</label>
-                    <input type="text" id="project-id" value="gen-lang-client-0691935742" placeholder="Your GCP Project ID">
+                <div class="config-columns">
+                    <!-- Left Column - Core Settings -->
+                    <div class="config-column">
+                        <div class="config-group">
+                            <label for="project-id">Project ID:</label>
+                            <input type="text" id="project-id" value="gen-lang-client-0691935742" placeholder="Your GCP Project ID">
+                        </div>
+                         <div class="config-group" style="display:none;">
+                            <label for="location">Location:</label>
+                            <select id="location">
+                                <option value="global">global</option>
+                                <option value="us-central1">us-central1</option>
+                                <option value="us-east1">us-east1</option>
+                                <option value="europe-west1">europe-west1</option>
+                                <option value="asia-east1">asia-east1</option>
+                            </select>
+                        </div>
+                        <div class="config-group">
+                            <label for="dataset-id">Dataset ID:</label>
+                            <input type="text" id="dataset-id" value="accountstable" placeholder="BigQuery Dataset ID">
+                        </div>
+                    </div>
+
+                    <!-- Right Column - Tables Configuration -->
+                    <div class="config-column">
+                        <div class="config-group" >
+                            <label for="available-tables">Available Tables:</label>
+                            <input type="text" id="available-tables" value="salestable, campaigns_table, accountstable, eur_currency_table, campaigns_stats_table" placeholder="salestable, campaigns, etc.">
+                        </div>
+                        <div class="config-group">
+                            <label for="table-id">Table ID (required):</label>
+                            <input type="text" id="table-id" value="" placeholder="Select a table from below">
+                            <!-- Table selector will be dynamically inserted here -->
+                        </div>
+                    </div>
                 </div>
-                <div class="config-group">
-                    <label for="location">Location:</label>
-                    <select id="location">
-                        <option value="global">global</option>
-                        <option value="us-central1">us-central1</option>
-                        <option value="us-east1">us-east1</option>
-                        <option value="europe-west1">europe-west1</option>
-                        <option value="asia-east1">asia-east1</option>
-                    </select>
-                </div>
-                <div class="config-group">
-                    <label for="dataset-id">BigQuery Dataset ID:</label>
-                    <input type="text" id="dataset-id" value="accountstable" placeholder="BigQuery Dataset ID">
-                </div>
-                <div class="config-group">
-                    <label for="table-id">BigQuery Table ID (optional):</label>
-                    <input type="text" id="table-id" value="salestable" placeholder="Leave empty for default">
-                </div>
-                <div class="config-group">
+
+                <!-- Full Width - Data Dictionary -->
+                <div class="config-group full-width">
                     <label for="data-dictionary">Data Dictionary (Field Definitions):</label>
-                    <textarea id="data-dictionary" rows="4" placeholder="Example:&#10;net_value: Final revenue amount (use for all revenue calculations)&#10;conversion_value: Initial conversion value&#10;conversion_date: Transaction date"></textarea>
-                    <small style="color: #6b7280; display: block; margin-top: 5px;">
-                        Define your fields to ensure consistent query results. Format: field_name: description
-                    </small>
+                    <textarea id="data-dictionary" rows="3" placeholder="Example:&#10;net_value: Final revenue amount (use for all revenue calculations)&#10;conversion_date: Transaction date"></textarea>
+                    <small class="config-hint">Define your fields to ensure consistent query results.</small>
                 </div>
+
+                <!-- Action Buttons -->
                 <div class="config-actions">
-                    <button id="save-config" class="save-btn">Save Configuration</button>
-                    <button id="reset-config" class="reset-btn">Reset to Defaults</button>
+                    <button id="save-config" class="save-btn">Save</button>
+                    <button id="reset-config" class="reset-btn">Reset</button>
                 </div>
                 <div class="config-status" id="config-status"></div>
             </div>

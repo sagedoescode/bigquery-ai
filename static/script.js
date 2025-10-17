@@ -1,5 +1,59 @@
+// Consolidate the initialization functions to avoid duplicate elements
 let conversationHistory = [];
 let isLoading = false;
+let currentConfig = {
+    project_id: 'gen-lang-client-0691935742',
+    location: 'global',
+    dataset_id: 'accountstable',
+    table_id: '', // Will be replaced with actual selected table
+    available_tables: [], // Will hold the dynamically discovered tables
+    data_dictionary: 'net_value: Final net revenue amount - use for all revenue calculations\nconversion_value: Initial conversion value - may differ from net_value\nconversion_date: Primary date field for time-based analysis'
+};
+
+// Main initialization function that combines all initialization tasks
+window.addEventListener('load', async function() {
+    // First initialize the config panel
+    initializeConfigPanel();
+
+    // Then initialize the data agent
+    try {
+        showLoading(true);
+        const response = await fetch('/api/initialize', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ config: currentConfig })
+        });
+
+        const data = await response.json();
+        if (!data.success) {
+            console.warn('Agent initialization failed:', data.error);
+            addMessage('Note: Some advanced features may not be available. You can still ask basic questions.');
+        } else {
+            console.log('Data agent initialized successfully');
+
+            // Update available tables if returned from backend
+            if (data.available_tables && Array.isArray(data.available_tables)) {
+                currentConfig.available_tables = data.available_tables;
+
+                // If no table is selected, select the first one
+                if (!currentConfig.table_id && data.available_tables.length > 0) {
+                    currentConfig.table_id = data.available_tables[0];
+                }
+
+                // Save updated config
+                localStorage.setItem('bigquery_config', JSON.stringify(currentConfig));
+                updateConfigInputs();
+            }
+        }
+    } catch (error) {
+        console.warn('Agent initialization error:', error);
+        addMessage('Welcome! I\'m ready to help with your data questions.');
+    } finally {
+        showLoading(false);
+    }
+});
 
 function addMessage(content, isUser = false, hasTable = false) {
     const messagesContainer = document.getElementById('chat-messages');
@@ -8,7 +62,13 @@ function addMessage(content, isUser = false, hasTable = false) {
 
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
-
+    if (!isUser && typeof content === 'string') {
+        // Replace "chart" with "table" in AI messages
+        content = content.replace(/chart/g, "table");
+    } else if (!isUser && content.text) {
+        // For complex responses that have a text property
+        content.text = content.text.replace(/chart/g, "table");
+    }
     if (typeof content === 'string') {
         contentDiv.innerHTML = content;
     } else {
@@ -77,12 +137,12 @@ function createTableHTML(tableData) {
         tableData.columns.forEach(column => {
             const th = document.createElement('th');
             th.textContent = column;
-            
+
             // Add column type styling if metadata is available
             if (tableData.metadata && tableData.metadata.column_types && tableData.metadata.column_types[column]) {
                 th.className = `column-${tableData.metadata.column_types[column]}`;
             }
-            
+
             headerRow.appendChild(th);
         });
 
@@ -91,8 +151,8 @@ function createTableHTML(tableData) {
     }
 
     // Create body using rows array (handle both display_rows and regular rows)
-    const rowsToDisplay = (tableData.metadata && tableData.metadata.display_rows) 
-        ? tableData.metadata.display_rows 
+    const rowsToDisplay = (tableData.metadata && tableData.metadata.display_rows)
+        ? tableData.metadata.display_rows
         : tableData.rows;
 
     if (rowsToDisplay && rowsToDisplay.length > 0) {
@@ -106,7 +166,7 @@ function createTableHTML(tableData) {
                 tableData.columns.forEach(column => {
                     const td = document.createElement('td');
                     const value = row[column];
-                    
+
                     // Format the value based on type
                     if (value === null || value === undefined) {
                         td.textContent = '';
@@ -121,7 +181,7 @@ function createTableHTML(tableData) {
                     } else {
                         td.textContent = String(value);
                     }
-                    
+
                     tr.appendChild(td);
                 });
             } else {
@@ -143,7 +203,7 @@ function createTableHTML(tableData) {
 
     tableWrapper.appendChild(table);
     tableContainer.appendChild(tableWrapper);
-    
+
     // Add truncation warning if applicable
     if (tableData.metadata && tableData.metadata.truncated) {
         const truncateDiv = document.createElement('div');
@@ -173,80 +233,6 @@ function showLoading(show = true) {
     }
 }
 
-async function sendMessage() {
-    if (isLoading) return;
-
-    const chatInput = document.getElementById('chat-input');
-    const message = chatInput.value.trim();
-
-    if (!message) return;
-
-    // Add user message
-    addMessage(message, true);
-    chatInput.value = '';
-
-    // Show loading
-    showLoading(true);
-
-    try {
-        const response = await fetch('/api/chat', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                message: message,
-                history: conversationHistory
-            })
-        });
-
-        const data = await response.json();
-
-        if (data.success && data.response) {
-            // Pass the entire response object to addMessage
-            addMessage(data.response);
-
-            // Update conversation history
-            conversationHistory.push({
-                role: 'user',
-                content: message
-            });
-
-            if (data.response.text) {
-                conversationHistory.push({
-                    role: 'assistant',
-                    content: data.response.text
-                });
-            }
-        } else {
-            const errorMsg = data.error || 'An unknown error occurred';
-            addMessage(`Error: ${errorMsg}`);
-        }
-
-    } catch (error) {
-        console.error('Error:', error);
-        addMessage('Sorry, there was an error processing your request. Please try again.');
-    } finally {
-        showLoading(false);
-    }
-}
-
-// Event listeners
-document.getElementById('chat-input').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-    }
-});
-// Add these functions to script.js
-
-let currentConfig = {
-    project_id: 'gen-lang-client-0691935742',
-    location: 'global',
-    dataset_id: 'accountstable',
-    table_id: 'salestable',
-    data_dictionary: 'net_value: Final net revenue amount - use for all revenue calculations\nconversion_value: Initial conversion value - may differ from net_value\nconversion_date: Primary date field for time-based analysis'
-};
 function initializeConfigPanel() {
     const configToggle = document.getElementById('config-toggle');
     const configContent = document.getElementById('config-content');
@@ -286,7 +272,87 @@ function updateConfigInputs() {
     document.getElementById('location').value = currentConfig.location;
     document.getElementById('dataset-id').value = currentConfig.dataset_id;
     document.getElementById('table-id').value = currentConfig.table_id || '';
-    document.getElementById('data-dictionary').value = currentConfig.data_dictionary || '';
+
+    // Update available tables list
+    const availableTablesInput = document.getElementById('available-tables');
+    if (availableTablesInput) {
+        if (Array.isArray(currentConfig.available_tables)) {
+            availableTablesInput.value = currentConfig.available_tables.join(', ');
+        } else if (typeof currentConfig.available_tables === 'string') {
+            availableTablesInput.value = currentConfig.available_tables;
+        } else {
+            availableTablesInput.value = '';
+        }
+    }
+
+    const dataDictionary = document.getElementById('data-dictionary');
+    if (dataDictionary) {
+        dataDictionary.value = currentConfig.data_dictionary || '';
+    }
+
+    // Clear any previous table selector before creating a new one
+    const existingSelector = document.querySelector('.table-selector');
+    if (existingSelector) {
+        existingSelector.remove();
+    }
+
+    // Create clickable table list if we have tables available
+    renderTableSelector();
+}
+
+function renderTableSelector() {
+    // First, remove any existing table selector to prevent duplicates
+    const existingSelector = document.querySelector('.table-selector');
+    if (existingSelector) {
+        existingSelector.remove();
+    }
+
+    const tableList = document.createElement('div');
+    tableList.className = 'table-selector';
+    tableList.innerHTML = '<p>Click to select a table:</p>';
+
+    let tables = [];
+    if (Array.isArray(currentConfig.available_tables)) {
+        tables = currentConfig.available_tables;
+    } else if (typeof currentConfig.available_tables === 'string') {
+        tables = currentConfig.available_tables.split(/\s*,\s*/);
+    }
+
+    if (tables.length > 0) {
+        const tableButtonsDiv = document.createElement('div');
+        tableButtonsDiv.className = 'table-buttons';
+
+        tables.forEach(table => {
+            if (table.trim()) {
+                const tableBtn = document.createElement('button');
+                tableBtn.className = 'table-select-btn';
+                tableBtn.textContent = table.trim();
+                if (currentConfig.table_id === table.trim()) {
+                    tableBtn.classList.add('selected');
+                }
+
+                tableBtn.addEventListener('click', () => {
+                    document.getElementById('table-id').value = table.trim();
+                    // Remove selected class from all buttons
+                    document.querySelectorAll('.table-select-btn').forEach(btn => {
+                        btn.classList.remove('selected');
+                    });
+                    // Add selected class to clicked button
+                    tableBtn.classList.add('selected');
+                });
+
+                tableButtonsDiv.appendChild(tableBtn);
+            }
+        });
+
+        tableList.appendChild(tableButtonsDiv);
+
+        // Insert after the table-id input
+        const tableIdInput = document.getElementById('table-id');
+        if (tableIdInput && tableIdInput.parentNode) {
+            tableIdInput.parentNode.insertAdjacentElement('afterend', tableList);
+        }
+    }
 }
 
 function saveConfiguration() {
@@ -295,17 +361,35 @@ function saveConfiguration() {
     const datasetId = document.getElementById('dataset-id').value.trim();
     const tableId = document.getElementById('table-id').value.trim();
 
+    // Handle the case where the available-tables input might be missing
+    let availableTables = [];
+    const availableTablesInput = document.getElementById('available-tables');
+    if (availableTablesInput) {
+        availableTables = availableTablesInput.value.trim().split(/\s*,\s*/);
+    } else if (Array.isArray(currentConfig.available_tables)) {
+        availableTables = currentConfig.available_tables;
+    } else if (typeof currentConfig.available_tables === 'string') {
+        availableTables = currentConfig.available_tables.split(/\s*,\s*/);
+    }
+
     if (!projectId || !datasetId) {
         showConfigStatus('Project ID and Dataset ID are required!', 'error');
         return;
     }
 
+    if (!tableId) {
+        showConfigStatus('Table ID is required! Please select a table.', 'error');
+        return;
+    }
+
+    const dataDictionary = document.getElementById('data-dictionary');
     const newConfig = {
         project_id: projectId,
         location: location,
         dataset_id: datasetId,
         table_id: tableId,
-        data_dictionary: document.getElementById('data-dictionary').value.trim()
+        available_tables: availableTables,
+        data_dictionary: dataDictionary ? dataDictionary.value.trim() : ''
     };
 
     // Save to localStorage
@@ -327,7 +411,8 @@ function resetConfiguration() {
         project_id: 'gen-lang-client-0691935742',
         location: 'global',
         dataset_id: 'accountstable',
-        table_id: 'salestable',
+        table_id: '', // Empty to enable auto-discovery
+        available_tables: 'salestable, campaigns_table, accountstable, eur_currency_table, campaigns_stats_table',
         data_dictionary: 'net_value: Final net revenue amount - use for all revenue calculations\nconversion_value: Initial conversion value - may differ from net_value\nconversion_date: Primary date field for time-based analysis'
     };
 
@@ -347,6 +432,7 @@ function showConfigStatus(message, type) {
     const statusEl = document.getElementById('config-status');
     statusEl.textContent = message;
     statusEl.className = `config-status ${type}`;
+    statusEl.style.display = 'block';
 
     // Auto-hide after 5 seconds
     setTimeout(() => {
@@ -354,7 +440,9 @@ function showConfigStatus(message, type) {
     }, 5000);
 }
 
-// Modify the existing sendMessage function to include config
+const MAX_RETRIES = 30;
+const RETRY_DELAY = 1000; // 1 second
+
 async function sendMessage() {
     if (isLoading) return;
 
@@ -363,102 +451,122 @@ async function sendMessage() {
 
     if (!message) return;
 
+    // Add user message
     addMessage(message, true);
     chatInput.value = '';
+
+    // Show loading
     showLoading(true);
 
-    try {
-        const response = await fetch('/api/chat', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                message: message,
-                history: conversationHistory,
-                config: currentConfig // Add current config
-            })
-        });
+    let retryCount = 0;
+    let success = false;
+    let lastError = null;
+    let responseData = null;
 
-        // Rest of the function remains the same...
-        const data = await response.json();
-
-        if (data.success && data.response) {
-            addMessage(data.response);
-            conversationHistory.push({
-                role: 'user',
-                content: message
+    while (retryCount < MAX_RETRIES && !success) {
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: message,
+                    history: conversationHistory,
+                    config: currentConfig
+                })
             });
 
-            if (data.response.text) {
-                conversationHistory.push({
-                    role: 'assistant',
-                    content: data.response.text
-                });
+            if (response.status === 400 || response.status === 403 || response.status === 500) {
+                // Silent retry for these specific errors
+                retryCount++;
+                console.warn(`Attempt ${retryCount}/${MAX_RETRIES} failed with status: ${response.status}. Retrying...`);
+                await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+                continue;
             }
-        } else {
-            const errorMsg = data.error || 'An unknown error occurred';
-            addMessage(`Error: ${errorMsg}`);
-        }
 
-    } catch (error) {
-        console.error('Error:', error);
-        addMessage('Sorry, there was an error processing your request. Please try again.');
-    } finally {
-        showLoading(false);
+            responseData = await response.json();
+            success = true;
+
+            if (responseData.success && responseData.response) {
+                // Update conversation history
+                conversationHistory.push({
+                    role: 'user',
+                    content: message
+                });
+
+                if (responseData.response.text) {
+                    conversationHistory.push({
+                        role: 'assistant',
+                        content: responseData.response.text
+                    });
+                }
+            } else {
+                lastError = responseData.error || 'An unknown error occurred';
+                success = false;
+                retryCount++;
+                await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            lastError = error.message || 'Network error';
+            retryCount++;
+            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+        }
     }
+
+    // Only proceed if we've succeeded
+    if (success && responseData?.success) {
+        addMessage(responseData.response);
+    } else {
+        // If we've exhausted all retries, show an error
+        console.error(`Failed after ${retryCount} attempts. Last error:`, lastError);
+        addMessage('Sorry, I couldn\'t process your request. Please try again in a moment.');
+    }
+
+    showLoading(false);
 }
 
-// Update the window load event listener
-window.addEventListener('load', async function() {
-    initializeConfigPanel(); // Initialize config panel first
+// Additional event listeners and DOM content loaded handlers
 
-    try {
-        showLoading(true);
-        const response = await fetch('/api/initialize', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ config: currentConfig }) // Send config to backend
-        });
+// Check that the 'available-tables' input exists and is visible
+window.addEventListener('DOMContentLoaded', function() {
+    // Make sure all config groups are visible
+    const configGroups = document.querySelectorAll('.config-group');
+    configGroups.forEach(group => {
+        group.style.display = 'block';
+    });
 
-        const data = await response.json();
-        if (!data.success) {
-            console.warn('Agent initialization failed:', data.error);
-            addMessage('Note: Some advanced features may not be available. You can still ask basic questions.');
-        } else {
-            console.log('Data agent initialized successfully');
+    // Check for available-tables input
+    const availableTablesInput = document.getElementById('available-tables');
+    if (!availableTablesInput) {
+        // Create it if it doesn't exist
+        const configColumnsDiv = document.querySelector('.config-columns');
+        if (configColumnsDiv) {
+            const configColumn = document.querySelector('.config-column');
+            if (configColumn) {
+                const availableTablesGroup = document.createElement('div');
+                availableTablesGroup.className = 'config-group';
+                availableTablesGroup.innerHTML = `
+                    <label for="available-tables">Available Tables:</label>
+                    <input type="text" id="available-tables" placeholder="comma-separated table names">
+                `;
+                configColumn.appendChild(availableTablesGroup);
+            }
         }
-    } catch (error) {
-        console.warn('Agent initialization error:', error);
-        addMessage('Welcome! I\'m ready to help with your data questions.');
-    } finally {
-        showLoading(false);
+    } else {
+        // Make sure parent is visible
+        availableTablesInput.parentElement.style.display = 'block';
+        // Add a border to make it more noticeable
+        availableTablesInput.style.borderColor = '#2563eb';
+        availableTablesInput.style.borderWidth = '2px';
     }
 });
-// Initialize the data agent on page load
-window.addEventListener('load', async function() {
-    try {
-        showLoading(true);
-        const response = await fetch('/api/initialize', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        });
 
-        const data = await response.json();
-        if (!data.success) {
-            console.warn('Agent initialization failed:', data.error);
-            addMessage('Note: Some advanced features may not be available. You can still ask basic questions.');
-        } else {
-            console.log('Data agent initialized successfully');
-        }
-    } catch (error) {
-        console.warn('Agent initialization error:', error);
-        addMessage('Welcome! Im ready to help with your data questions.');
-    } finally {
-        showLoading(false);
+// Add event listener for chat input
+document.getElementById('chat-input').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
     }
 });
