@@ -39,7 +39,7 @@ window.addEventListener('load', async function() {
 
                 // If no table is selected, select the first one
                 if (!currentConfig.table_id && data.available_tables.length > 0) {
-                    currentConfig.table_id = data.available_tables[0];
+                    currentConfig.table_id = data.available_tables.join(', ');
                 }
 
                 // Save updated config
@@ -271,7 +271,7 @@ function updateConfigInputs() {
     document.getElementById('project-id').value = currentConfig.project_id;
     document.getElementById('location').value = currentConfig.location;
     document.getElementById('dataset-id').value = currentConfig.dataset_id;
-    document.getElementById('table-id').value = currentConfig.table_id || '';
+
     const tableSelect = document.getElementById('table-id');
     if (tableSelect && Array.isArray(currentConfig.available_tables)) {
         tableSelect.innerHTML = '';
@@ -280,16 +280,22 @@ function updateConfigInputs() {
             option.value = table;
             option.textContent = table;
 
-            // ✅ Select all by default
-            if (
-                !currentConfig.table_id ||  // nothing configured yet
-                currentConfig.table_id.split(',').includes(table)
-            ) {
+            // ✅ Select ALL tables by default when initializing
+            if (!currentConfig.table_id || currentConfig.table_id === '') {
                 option.selected = true;
+            } else {
+                // If there's existing config, respect it
+                const selectedTables = currentConfig.table_id.split(',').map(t => t.trim());
+                option.selected = selectedTables.includes(table);
             }
 
             tableSelect.appendChild(option);
         });
+
+        // Update the currentConfig.table_id to reflect all selected tables
+        if (!currentConfig.table_id || currentConfig.table_id === '') {
+            currentConfig.table_id = currentConfig.available_tables.join(', ');
+        }
     }
 
     // Update available tables list
@@ -316,7 +322,7 @@ function updateConfigInputs() {
     }
 
     // Create clickable table list if we have tables available
-    renderTableSelector();
+    //renderTableSelector();
 }
 
 function renderTable(tableData) {
@@ -414,7 +420,7 @@ function resetConfiguration() {
         project_id: 'gen-lang-client-0691935742',
         location: 'global',
         dataset_id: 'accountstable',
-        table_id: '', // Empty to enable auto-discovery
+        table_id: '', // Empty to enable auto-discovery AND select all
         available_tables: 'salestable, campaigns_table, accountstable, eur_currency_table, campaigns_stats_table',
         data_dictionary: 'net_value: Final net revenue amount - use for all revenue calculations\nconversion_value: Initial conversion value - may differ from net_value\nconversion_date: Primary date field for time-based analysis'
     };
