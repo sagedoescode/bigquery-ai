@@ -272,7 +272,19 @@ function updateConfigInputs() {
     document.getElementById('location').value = currentConfig.location;
     document.getElementById('dataset-id').value = currentConfig.dataset_id;
     document.getElementById('table-id').value = currentConfig.table_id || '';
-
+    const tableSelect = document.getElementById('table-id');
+    if (tableSelect && Array.isArray(currentConfig.available_tables)) {
+        tableSelect.innerHTML = '';
+        currentConfig.available_tables.forEach(table => {
+            const option = document.createElement('option');
+            option.value = table;
+            option.textContent = table;
+            if (currentConfig.table_id && currentConfig.table_id.split(',').includes(table)) {
+                option.selected = true;
+            }
+            tableSelect.appendChild(option);
+        });
+    }
     // Update available tables list
     const availableTablesInput = document.getElementById('available-tables');
     if (availableTablesInput) {
@@ -300,66 +312,50 @@ function updateConfigInputs() {
     renderTableSelector();
 }
 
-function renderTableSelector() {
-    // First, remove any existing table selector to prevent duplicates
-    const existingSelector = document.querySelector('.table-selector');
-    if (existingSelector) {
-        existingSelector.remove();
-    }
+function renderTable(tableData) {
+    // Important: Don't re-format numbers here if they're already formatted
+    // in the Python backend
 
-    const tableList = document.createElement('div');
-    tableList.className = 'table-selector';
-    tableList.innerHTML = '<p>Click to select a table:</p>';
+    const table = document.createElement('table');
+    const thead = document.createElement('thead');
+    const tbody = document.createElement('tbody');
 
-    let tables = [];
-    if (Array.isArray(currentConfig.available_tables)) {
-        tables = currentConfig.available_tables;
-    } else if (typeof currentConfig.available_tables === 'string') {
-        tables = currentConfig.available_tables.split(/\s*,\s*/);
-    }
+    // Create header row
+    const headerRow = document.createElement('tr');
+    tableData.columns.forEach(column => {
+        const th = document.createElement('th');
+        th.textContent = column;
+        headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
 
-    if (tables.length > 0) {
-        const tableButtonsDiv = document.createElement('div');
-        tableButtonsDiv.className = 'table-buttons';
-
-        tables.forEach(table => {
-            if (table.trim()) {
-                const tableBtn = document.createElement('button');
-                tableBtn.className = 'table-select-btn';
-                tableBtn.textContent = table.trim();
-                if (currentConfig.table_id === table.trim()) {
-                    tableBtn.classList.add('selected');
-                }
-
-                tableBtn.addEventListener('click', () => {
-                    document.getElementById('table-id').value = table.trim();
-                    // Remove selected class from all buttons
-                    document.querySelectorAll('.table-select-btn').forEach(btn => {
-                        btn.classList.remove('selected');
-                    });
-                    // Add selected class to clicked button
-                    tableBtn.classList.add('selected');
-                });
-
-                tableButtonsDiv.appendChild(tableBtn);
-            }
+    // Create data rows
+    tableData.rows.forEach(row => {
+        const tr = document.createElement('tr');
+        tableData.columns.forEach(column => {
+            const td = document.createElement('td');
+            // Don't modify the values here - use them directly as received
+            td.textContent = row[column] !== null ? row[column] : '';
+            tr.appendChild(td);
         });
+        tbody.appendChild(tr);
+    });
 
-        tableList.appendChild(tableButtonsDiv);
+    table.appendChild(thead);
+    table.appendChild(tbody);
 
-        // Insert after the table-id input
-        const tableIdInput = document.getElementById('table-id');
-        if (tableIdInput && tableIdInput.parentNode) {
-            tableIdInput.parentNode.insertAdjacentElement('afterend', tableList);
-        }
-    }
+    return table;
 }
 
 function saveConfiguration() {
     const projectId = document.getElementById('project-id').value.trim();
     const location = document.getElementById('location').value;
     const datasetId = document.getElementById('dataset-id').value.trim();
-    const tableId = document.getElementById('table-id').value.trim();
+    let tableId = '';
+    const tableSelect = document.getElementById('table-id');
+    if (tableSelect && tableSelect.selectedOptions.length > 0) {
+        tableId = Array.from(tableSelect.selectedOptions).map(opt => opt.value).join(', ');
+    }
 
     // Handle the case where the available-tables input might be missing
     let availableTables = [];

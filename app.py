@@ -122,24 +122,32 @@ class BigQueryChatbot:
                 logger.info(f"Data agent '{self.data_agent_name}' not found. Creating a new one.")
 
             # Create BigQuery data source reference (REQUIRED)
-            bigquery_table_reference = geminidataanalytics.BigQueryTableReference()
-
-            # Use the configured table if available, otherwise use public dataset for testing
+            table_ids = []
             if self.table_id:
-                bigquery_table_reference.project_id = self.project_id
-                bigquery_table_reference.dataset_id = self.dataset_id
-                bigquery_table_reference.table_id = self.table_id
-                logger.info(f"Using configured BigQuery table: {self.project_id}.{self.dataset_id}.{self.table_id}")
-            else:
-                # Fallback to public dataset for testing
-                bigquery_table_reference.project_id = "gen-lang-client-0691935742"
-                bigquery_table_reference.dataset_id = "accountstable"
-                bigquery_table_reference.table_id = ""
-                logger.info("Using public BigQuery dataset for testing: bigquery-public-data.samples.shakespeare")
+                # Allow comma-separated or list input
+                if isinstance(self.table_id, str):
+                    table_ids = [t.strip() for t in self.table_id.split(",") if t.strip()]
+                elif isinstance(self.table_id, list):
+                    table_ids = self.table_id
 
-            # Create datasource references (REQUIRED - this was missing in original code)
-            datasource_references = geminidataanalytics.DatasourceReferences()
-            datasource_references.bq.table_references = [bigquery_table_reference]
+            if not table_ids:
+                # Fallback to default demo tables
+                table_ids = ["salestable", "campaigns_table", "accountstable", "eur_currency_table",
+                             "campaigns_stats_table"]
+
+            table_references = []
+            for table_id in table_ids:
+                ref = geminidataanalytics.BigQueryTableReference(
+                    project_id=self.project_id,
+                    dataset_id=self.dataset_id,
+                    table_id=table_id
+                )
+                table_references.append(ref)
+                logger.info(f"Added table reference: {self.project_id}.{self.dataset_id}.{table_id}")
+
+            datasource_references = geminidataanalytics.DatasourceReferences(
+                bq=geminidataanalytics.BigQueryTableReferences(table_references=table_references)
+            )
 
             # Set up published context with datasource references
             published_context = geminidataanalytics.Context()
@@ -289,6 +297,39 @@ class BigQueryChatbot:
             logger.error(f"Chat error: {e}")
             raise
 
+    def clean_response_text(self, response_text):
+        """
+        Clean and format the response text from Gemini to improve readability
+        by removing redundant data tables, JSON visualization code, etc.
+        """
+        import re
+
+        # Remove any JSON visualization code blocks
+        json_pattern = r'```json.*?```'
+        cleaned_text = re.sub(json_pattern, '', response_text, flags=re.DOTALL)
+
+        # Remove "Showing X of Y rows" text that appears before tables
+        showing_rows_pattern = r'Showing \d+ of \d+ rows'
+        cleaned_text = re.sub(showing_rows_pattern, '', cleaned_text)
+
+        # Remove any duplicated content (sometimes the model repeats itself)
+        # This looks for sections of 50+ characters that are repeated
+        duplicated_section_pattern = r'(.{50,})(.*\1)'
+        match = re.search(duplicated_section_pattern, cleaned_text)
+        if match:
+            # Keep only the first occurrence of the duplicated section
+            cleaned_text = cleaned_text[:match.start(2)] + cleaned_text[match.end(1):]
+
+        # Remove any "Here's a table" text that might appear before the actual table data
+        table_intro_pattern = r"(Here's a table[^:]*:)"
+        cleaned_text = re.sub(table_intro_pattern, '', cleaned_text)
+
+        # Clean up any trailing whitespace or empty code blocks
+        cleaned_text = re.sub(r'```\s*```', '', cleaned_text)
+        cleaned_text = re.sub(r'\n{3,}', '\n\n', cleaned_text)
+        cleaned_text = cleaned_text.strip()
+
+        return cleaned_text
     def _extract_table_data(self, data_result):
         """Extract table data from the API response"""
         try:
@@ -359,36 +400,56 @@ class BigQueryChatbot:
             if not table_data:
                 return table_data
 
+            # Create a deep copy of the rows to avoid modifying the original data
+            import copy
+            formatted_rows = copy.deepcopy(table_data['rows'])
+
+            # Identify numeric columns and apply formatting
+            column_types = {}
+            if formatted_rows:
+                # First pass: detect column types
+                for col in table_data['columns']:
+                    is_numeric = False
+                    for row in formatted_rows:
+                        val = row.get(col)
+                        if val is not None and isinstance(val, (int, float)):
+                            is_numeric = True
+                            break
+                    column_types[col] = 'numeric' if is_numeric else 'text'
+
+                # Second pass: apply formatting to numeric columns
+                for row in formatted_rows:
+                    for col in table_data['columns']:
+                        if column_types[col] == 'numeric' and row[col] is not None:
+                            if isinstance(row[col], int):
+                                # Format integers with thousand separators
+                                row[col] = "{:,}".format(row[col])
+                            elif isinstance(row[col], float):
+                                # Format floats with thousand separators and 2 decimal places
+                                # Handle large floats that should display as integers
+                                if row[col] == int(row[col]):
+                                    row[col] = "{:,}".format(int(row[col]))
+                                else:
+                                    row[col] = "{:,.2f}".format(row[col])
+
             # Add formatting metadata for better rendering
             formatted_table = {
                 'columns': table_data['columns'],
-                'rows': table_data['rows'],
+                'rows': formatted_rows,  # Use the formatted rows
                 'metadata': {
                     'total_rows': len(table_data['rows']),
                     'total_columns': len(table_data['columns']),
                     'truncated': len(table_data['rows']) > 100,  # Flag if table is large
-                    'display_rows': table_data['rows'][:100] if len(table_data['rows']) > 100 else table_data['rows']
+                    'display_rows': formatted_rows[:100] if len(formatted_rows) > 100 else formatted_rows,
+                    'column_types': column_types
                 }
             }
-
-            # Add column types if we can infer them
-            column_types = {}
-            if formatted_table['rows']:
-                sample_row = formatted_table['rows'][0]
-                for col in formatted_table['columns']:
-                    val = sample_row.get(col)
-                    if isinstance(val, (int, float)):
-                        column_types[col] = 'numeric'
-                    elif isinstance(val, bool):
-                        column_types[col] = 'boolean'
-                    else:
-                        column_types[col] = 'text'
-            formatted_table['metadata']['column_types'] = column_types
 
             return formatted_table
 
         except Exception as e:
-            logger.error(f"Error formatting table: {e}")
+            logger.error(f"Error formatting table: {e}", exc_info=True)
+            # Return original data if formatting fails
             return table_data
 
     # REMOVED both _extract_chart_data and _extract_chart_data_alternative methods
