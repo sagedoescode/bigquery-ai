@@ -279,12 +279,19 @@ function updateConfigInputs() {
             const option = document.createElement('option');
             option.value = table;
             option.textContent = table;
-            if (currentConfig.table_id && currentConfig.table_id.split(',').includes(table)) {
+
+            // ✅ Select all by default
+            if (
+                !currentConfig.table_id ||  // nothing configured yet
+                currentConfig.table_id.split(',').includes(table)
+            ) {
                 option.selected = true;
             }
+
             tableSelect.appendChild(option);
         });
     }
+
     // Update available tables list
     const availableTablesInput = document.getElementById('available-tables');
     if (availableTablesInput) {
